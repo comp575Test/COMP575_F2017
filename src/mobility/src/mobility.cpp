@@ -60,6 +60,7 @@ ros::Publisher target_collected_publisher;
 ros::Publisher angular_publisher;
 ros::Publisher messagePublish;
 ros::Publisher debug_publisher;
+ros::Publisher posePublish;
 
 //Subscribers
 ros::Subscriber joySubscriber;
@@ -67,8 +68,8 @@ ros::Subscriber modeSubscriber;
 ros::Subscriber targetSubscriber;
 ros::Subscriber obstacleSubscriber;
 ros::Subscriber odometrySubscriber;
-
 ros::Subscriber messageSubscriber;
+ros::Subscriber poseSubscriber;
 
 //Timers
 ros::Timer stateMachineTimer;
@@ -90,6 +91,8 @@ void odometryHandler(const nav_msgs::Odometry::ConstPtr &message);
 void mobilityStateMachine(const ros::TimerEvent &);
 void publishStatusTimerEventHandler(const ros::TimerEvent &event);
 void killSwitchTimerEventHandler(const ros::TimerEvent &event);
+void messageHandler(const std_msgs::String::ConstPtr &message);
+void poseHandler(const std_msgs::String::ConstPtr &message);
 
 int main(int argc, char **argv)
 {
@@ -118,18 +121,20 @@ int main(int argc, char **argv)
     targetSubscriber = mNH.subscribe((rover_name + "/targets"), 10, targetHandler);
     obstacleSubscriber = mNH.subscribe((rover_name + "/obstacle"), 10, obstacleHandler);
     odometrySubscriber = mNH.subscribe((rover_name + "/odom/ekf"), 10, odometryHandler);
-//    messageSubscriber = mNH.subscribe(("messages"), 10, messageHandler);
+    messageSubscriber = mNH.subscribe(("messages"), 10, messageHandler);
+    poseSubscriber = mNH.subscribe(("poses"), 10, poseHandler);
 
     status_publisher = mNH.advertise<std_msgs::String>((rover_name + "/status"), 1, true);
     velocityPublish = mNH.advertise<geometry_msgs::Twist>((rover_name + "/velocity"), 10);
     stateMachinePublish = mNH.advertise<std_msgs::String>((rover_name + "/state_machine"), 1, true);
-    messagePublish = mNH.advertise<std_msgs::String>(("messages"), 10, true);
     target_collected_publisher = mNH.advertise<std_msgs::Int16>(("targetsCollected"), 1, true);
     angular_publisher = mNH.advertise<std_msgs::String>((rover_name + "/angular"),1,true);
     publish_status_timer = mNH.createTimer(ros::Duration(status_publish_interval), publishStatusTimerEventHandler);
     killSwitchTimer = mNH.createTimer(ros::Duration(kill_switch_timeout), killSwitchTimerEventHandler);
     stateMachineTimer = mNH.createTimer(ros::Duration(mobility_loop_time_step), mobilityStateMachine);
     debug_publisher = mNH.advertise<std_msgs::String>("/debug", 1, true);
+    messagePublish = mNH.advertise<std_msgs::String>(("messages"), 10, true);
+    posePublish = mNH.advertise<std_msgs::String>(("poses"), 10, true);
 
     ros::spin();
     return EXIT_SUCCESS;
@@ -174,6 +179,12 @@ void mobilityStateMachine(const ros::TimerEvent &)
 
         state_machine_msg.data = "WAITING, " + converter.str();
     }
+    std_msgs::String pose_message;
+    std::stringstream converter;
+    converter << rover_name << ", " << current_location.x << ", " << current_location.y << ", " << current_location.theta;
+    pose_message.data = converter.str();
+    posePublish.publish(pose_message);
+
     stateMachinePublish.publish(state_machine_msg);
 }
 
@@ -202,6 +213,12 @@ void modeHandler(const std_msgs::UInt8::ConstPtr &message)
 {
     simulation_mode = message->data;
     setVelocity(0.0, 0.0);
+}
+
+void poseHandler(const std_msgs::String::ConstPtr& message)
+{
+//   std_msgs::String debug_msg;
+   string msg = message->data;
 }
 
 void obstacleHandler(const std_msgs::UInt8::ConstPtr &message)
@@ -273,4 +290,9 @@ void sigintEventHandler(int sig)
 {
     // All the default sigint handler does is call shutdown()
     ros::shutdown();
+}
+
+void messageHandler(const std_msgs::String::ConstPtr& message)
+{
+
 }
